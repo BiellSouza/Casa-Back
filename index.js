@@ -8,6 +8,11 @@ const prisma = new PrismaClient();
 app.use(cors());
 app.use(express.json());
 
+// Rota raiz para evitar erro "Cannot GET /"
+app.get("/", (req, res) => {
+  res.send("✅ API do Casa-Back está online!");
+});
+
 // Listar produtos
 app.get("/produtos", async (req, res) => {
   try {
