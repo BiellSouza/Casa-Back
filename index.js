@@ -1,77 +1,54 @@
+// server.js
 const express = require("express");
-const { PrismaClient } = require("@prisma/client");
+const mongoose = require("mongoose");
 const cors = require("cors");
+require("dotenv").config();
 
 const app = express();
-const prisma = new PrismaClient();
-
 app.use(cors());
 app.use(express.json());
 
-// Rota raiz para evitar erro "Cannot GET /"
-app.get("/", (req, res) => {
-  res.send("✅ API do Casa-Back está online!");
+// Conectar ao MongoDB Atlas
+mongoose.connect(process.env.DATABASE_URL, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
 });
 
-// Listar produtos
+// Definir schema e model
+const produtoSchema = new mongoose.Schema({
+  nome: String,
+  descricao: String,
+  imagem: String,
+  categoria: String,
+  criadoEm: { type: Date, default: Date.now },
+});
+
+const Produto = mongoose.model("Produto", produtoSchema);
+
+// Rotas
+app.get("/", (req, res) => res.send("✅ API com mongoose online!"));
+
 app.get("/produtos", async (req, res) => {
-  try {
-    const produtos = await prisma.produto.findMany();
-    res.json(produtos);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ erro: "Erro ao buscar produtos" });
-  }
+  const produtos = await Produto.find();
+  res.json(produtos);
 });
 
-// Criar produto
 app.post("/produtos", async (req, res) => {
-  const { nome, descricao, imagem, categoria } = req.body;
-
-  try {
-    const produto = await prisma.produto.create({
-      data: { nome, descricao, imagem, categoria },
-    });
-    res.status(201).json(produto);
-  } catch (error) {
-    console.error(error);
-    res.status(400).json({ erro: "Erro ao criar produto" });
-  }
+  const novoProduto = new Produto(req.body);
+  const salvo = await novoProduto.save();
+  res.status(201).json(salvo);
 });
 
-// Atualizar produto
-app.put("/produtos/:id", async (req, res) => {
-  const { id } = req.params;
-  const { nome, descricao, imagem, categoria } = req.body;
-
-  try {
-    const produto = await prisma.produto.update({
-      where: { id },
-      data: { nome, descricao, imagem, categoria },
-    });
-    res.json(produto);
-  } catch (error) {
-    console.error(error);
-    res.status(400).json({ erro: "Erro ao atualizar produto" });
-  }
-});
-
-// Deletar produto
 app.delete("/produtos/:id", async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    await prisma.produto.delete({
-      where: { id },
-    });
-    res.json({ mensagem: "Produto deletado com sucesso" });
-  } catch (error) {
-    console.error(error);
-    res.status(400).json({ erro: "Erro ao deletar produto" });
-  }
+  await Produto.findByIdAndDelete(req.params.id);
+  res.json({ mensagem: "Produto deletado" });
 });
 
-// Rodar servidor
-app.listen(3000, () => {
-  console.log("API rodando em http://localhost:3000");
+app.put("/produtos/:id", async (req, res) => {
+  const atualizado = await Produto.findByIdAndUpdate(req.params.id, req.body, {
+    new: true,
+  });
+  res.json(atualizado);
 });
+
+app.listen(3000, () => console.log("Servidor rodando na porta 3000"));
