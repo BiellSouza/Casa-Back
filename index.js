@@ -14,6 +14,11 @@ app.use(
 
 app.use(express.json());
 
+// Rota raiz para teste simples
+app.get("/", (req, res) => {
+  res.send("API Casa Backend está funcionando!");
+});
+
 // Listar produtos (somente os não excluídos por padrão)
 app.get("/produtos", async (req, res) => {
   try {
