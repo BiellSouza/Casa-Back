@@ -26,6 +26,5 @@ model Produto {
   imagem    String?
   categoria String?   // <-- categoria agora é opcional
   criadoEm  DateTime @default(now())
-  excluido   Boolean  @default(false) 
 }
 
