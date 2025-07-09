@@ -1,23 +1,44 @@
-// backend/index.js
 const express = require("express");
 const { PrismaClient } = require("@prisma/client");
 const cors = require("cors");
-const { ObjectId } = require("mongodb");
 
 const app = express();
 const prisma = new PrismaClient();
 
-app.use(cors());
+// Configura CORS para liberar só o frontend da Vercel
+app.use(
+  cors({
+    origin: "https://casa-front.vercel.app",
+  })
+);
+
 app.use(express.json());
 
-// Listar produtos
+// Listar produtos (somente os não excluídos por padrão)
 app.get("/produtos", async (req, res) => {
   try {
-    const produtos = await prisma.produto.findMany();
+    const produtos = await prisma.produto.findMany({
+      where: { excluido: false },
+      orderBy: { criadoEm: "desc" },
+    });
     res.json(produtos);
   } catch (error) {
     console.error(error);
     res.status(500).json({ erro: "Erro ao buscar produtos" });
+  }
+});
+
+// Listar produtos excluídos (lixeira)
+app.get("/produtos/lixeira", async (req, res) => {
+  try {
+    const produtosExcluidos = await prisma.produto.findMany({
+      where: { excluido: true },
+      orderBy: { criadoEm: "desc" },
+    });
+    res.json(produtosExcluidos);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ erro: "Erro ao buscar produtos excluídos" });
   }
 });
 
@@ -26,7 +47,7 @@ app.post("/produtos", async (req, res) => {
   const { nome, descricao, imagem, categoria } = req.body;
   try {
     const produto = await prisma.produto.create({
-      data: { nome, descricao, imagem, categoria },
+      data: { nome, descricao, imagem, categoria, excluido: false },
     });
     res.status(201).json(produto);
   } catch (error) {
@@ -40,16 +61,7 @@ app.put("/produtos/:id", async (req, res) => {
   const { id } = req.params;
   const { nome, descricao, imagem, categoria } = req.body;
 
-  if (!ObjectId.isValid(id)) {
-    return res.status(400).json({ erro: "ID inválido" });
-  }
-
   try {
-    const existente = await prisma.produto.findUnique({ where: { id } });
-    if (!existente) {
-      return res.status(404).json({ erro: "Produto não encontrado" });
-    }
-
     const produto = await prisma.produto.update({
       where: { id },
       data: { nome, descricao, imagem, categoria },
@@ -57,24 +69,47 @@ app.put("/produtos/:id", async (req, res) => {
     res.json(produto);
   } catch (error) {
     console.error("Erro ao atualizar produto:", error.message);
-    res.status(400).json({ erro: "Erro ao atualizar produto", detalhe: error.message });
+    res
+      .status(400)
+      .json({ erro: "Erro ao atualizar produto", detalhe: error.message });
   }
 });
 
-// Deletar produto
+// Excluir produto (exclusão lógica)
 app.delete("/produtos/:id", async (req, res) => {
   const { id } = req.params;
-
-  if (!ObjectId.isValid(id)) {
-    return res.status(400).json({ erro: "ID inválido" });
-  }
+  console.log("ID recebido para exclusão:", id);
 
   try {
-    await prisma.produto.delete({ where: { id } });
-    res.json({ mensagem: "Produto deletado com sucesso" });
+    const produto = await prisma.produto.update({
+      where: { id },
+      data: { excluido: true },
+    });
+    console.log("Produto marcado como excluído:", produto);
+    res.json({ mensagem: "Produto excluído logicamente", produto });
   } catch (error) {
-    console.error("Erro ao deletar produto:", error.message);
-    res.status(400).json({ erro: "Erro ao deletar produto", detalhe: error.message });
+    console.error("Erro ao excluir produto:", error.message);
+    res
+      .status(400)
+      .json({ erro: "Erro ao excluir produto", detalhe: error.message });
+  }
+});
+
+// Restaurar produto da lixeira
+app.put("/produtos/:id/restaurar", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const produto = await prisma.produto.update({
+      where: { id },
+      data: { excluido: false },
+    });
+    res.json({ mensagem: "Produto restaurado", produto });
+  } catch (error) {
+    console.error("Erro ao restaurar produto:", error.message);
+    res
+      .status(400)
+      .json({ erro: "Erro ao restaurar produto", detalhe: error.message });
   }
 });
 
