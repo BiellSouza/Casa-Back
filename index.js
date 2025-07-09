@@ -18,12 +18,19 @@ async function atualizarProdutosSemExcluido() {
   try {
     const resultado = await prisma.produto.updateMany({
       where: {
-        excluido: null, // filtra produtos que não têm o campo excluido definido
+        NOT: {
+          excluido: {
+            equals: true, // excluido == true (produto excluído)
+          },
+        },
+        // Ou melhor ainda, filtrar onde excluido é undefined / null não dá,
+        // mas você pode usar 'excluido' não igual a true para atualizar os que não tem o campo
       },
       data: {
         excluido: false,
       },
     });
+
     console.log(`Produtos atualizados: ${resultado.count}`);
   } catch (error) {
     console.error("Erro ao atualizar produtos antigos:", error);
