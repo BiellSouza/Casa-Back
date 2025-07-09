@@ -1,5 +1,14 @@
-// Remover import do ObjectId pois não é usado
-// const { ObjectId } = require("mongodb");
+const express = require("express");
+const { PrismaClient } = require("@prisma/client");
+const cors = require("cors");
+
+const app = express();
+const prisma = new PrismaClient();
+
+app.use(cors());
+app.use(express.json());
+
+const PORT = process.env.PORT || 3000;
 
 app.put("/produtos/:id", async (req, res) => {
   const { id } = req.params;
