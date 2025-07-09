@@ -7,21 +7,17 @@ const prisma = new PrismaClient();
 
 const allowedOrigins = [
   "https://casa-front.vercel.app",
-  // seu localhost pode ser adicionado se quiser:
-  // "http://localhost:5173",
+  // "http://localhost:5173", // se quiser localhost também
 ];
 
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Permite requisições sem origin (curl, Postman)
       if (!origin) return callback(null, true);
-
       if (allowedOrigins.indexOf(origin) === -1) {
         const msg = `CORS policy: acesso negado para a origem ${origin}`;
         return callback(new Error(msg), false);
       }
-
       return callback(null, true);
     },
   })
@@ -29,14 +25,15 @@ app.use(
 
 app.use(express.json());
 
+// Rota raiz de teste
 app.get("/", (req, res) => {
   res.send("API Casa Backend está funcionando!");
 });
 
+// Listar todos produtos (sem filtro)
 app.get("/produtos", async (req, res) => {
   try {
     const produtos = await prisma.produto.findMany({
-      where: { excluido: false },
       orderBy: { criadoEm: "desc" },
     });
     res.json(produtos);
@@ -46,24 +43,12 @@ app.get("/produtos", async (req, res) => {
   }
 });
 
-app.get("/produtos/lixeira", async (req, res) => {
-  try {
-    const produtosExcluidos = await prisma.produto.findMany({
-      where: { excluido: true },
-      orderBy: { criadoEm: "desc" },
-    });
-    res.json(produtosExcluidos);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ erro: "Erro ao buscar produtos excluídos" });
-  }
-});
-
+// Criar produto
 app.post("/produtos", async (req, res) => {
   const { nome, descricao, imagem, categoria } = req.body;
   try {
     const produto = await prisma.produto.create({
-      data: { nome, descricao, imagem, categoria, excluido: false },
+      data: { nome, descricao, imagem, categoria },
     });
     res.status(201).json(produto);
   } catch (error) {
@@ -72,8 +57,9 @@ app.post("/produtos", async (req, res) => {
   }
 });
 
+// Atualizar produto
 app.put("/produtos/:id", async (req, res) => {
-  const id = parseInt(req.params.id);
+  const { id } = req.params;
   const { nome, descricao, imagem, categoria } = req.body;
 
   try {
@@ -90,39 +76,20 @@ app.put("/produtos/:id", async (req, res) => {
   }
 });
 
+// Excluir produto (exclusão física)
 app.delete("/produtos/:id", async (req, res) => {
-  const id = parseInt(req.params.id);
-  console.log("ID recebido para exclusão:", id);
+  const { id } = req.params;
 
   try {
-    const produto = await prisma.produto.update({
+    await prisma.produto.delete({
       where: { id },
-      data: { excluido: true },
     });
-    console.log("Produto marcado como excluído:", produto);
-    res.json({ mensagem: "Produto excluído logicamente", produto });
+    res.json({ mensagem: "Produto excluído fisicamente" });
   } catch (error) {
     console.error("Erro ao excluir produto:", error.message);
     res
       .status(400)
       .json({ erro: "Erro ao excluir produto", detalhe: error.message });
-  }
-});
-
-app.put("/produtos/:id/restaurar", async (req, res) => {
-  const id = parseInt(req.params.id);
-
-  try {
-    const produto = await prisma.produto.update({
-      where: { id },
-      data: { excluido: false },
-    });
-    res.json({ mensagem: "Produto restaurado", produto });
-  } catch (error) {
-    console.error("Erro ao restaurar produto:", error.message);
-    res
-      .status(400)
-      .json({ erro: "Erro ao restaurar produto", detalhe: error.message });
   }
 });
 
