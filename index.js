@@ -7,7 +7,7 @@ const prisma = new PrismaClient();
 
 const allowedOrigins = [
   "https://casa-front.vercel.app",
-  // "http://localhost:5173", // se quiser localhost também
+  "http://localhost:5173", // se quiser localhost também
 ];
 
 app.use(
