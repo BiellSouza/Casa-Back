@@ -1,150 +1,53 @@
-const express = require("express");
-const { PrismaClient } = require("@prisma/client");
-const cors = require("cors");
+// Remover import do ObjectId pois não é usado
+// const { ObjectId } = require("mongodb");
 
-const app = express();
-const prisma = new PrismaClient();
+app.put("/produtos/:id", async (req, res) => {
+  const { id } = req.params;
+  const { nome, descricao, imagem, categoria } = req.body;
 
-app.use(
-  cors({
-    origin: "https://casa-front.vercel.app",
-  })
-);
-
-app.use(express.json());
-
-// Função para atualizar produtos que não têm campo "excluido" definido
-async function atualizarProdutosSemExcluido() {
-  try {
-    const resultado = await prisma.produto.updateMany({
-      where: {
-        NOT: {
-          excluido: {
-            equals: true, // excluido == true (produto excluído)
-          },
-        },
-        // Ou melhor ainda, filtrar onde excluido é undefined / null não dá,
-        // mas você pode usar 'excluido' não igual a true para atualizar os que não tem o campo
-      },
-      data: {
-        excluido: false,
-      },
-    });
-
-    console.log(`Produtos atualizados: ${resultado.count}`);
-  } catch (error) {
-    console.error("Erro ao atualizar produtos antigos:", error);
+  const idNum = Number(id);
+  if (isNaN(idNum)) {
+    return res.status(400).json({ erro: "ID inválido" });
   }
-}
 
-// Atualiza os produtos e só depois sobe o servidor
-atualizarProdutosSemExcluido().then(() => {
-  // Rota raiz para teste simples
-  app.get("/", (req, res) => {
-    res.send("API Casa Backend está funcionando!");
-  });
-
-  // Listar produtos (somente os não excluídos)
-  app.get("/produtos", async (req, res) => {
-    try {
-      const produtos = await prisma.produto.findMany({
-        where: { excluido: false },
-        orderBy: { criadoEm: "desc" },
-      });
-      res.json(produtos);
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ erro: "Erro ao buscar produtos" });
+  try {
+    const existente = await prisma.produto.findUnique({ where: { id: idNum } });
+    if (!existente) {
+      return res.status(404).json({ erro: "Produto não encontrado" });
     }
-  });
 
-  // Listar produtos excluídos (lixeira)
-  app.get("/produtos/lixeira", async (req, res) => {
-    try {
-      const produtosExcluidos = await prisma.produto.findMany({
-        where: { excluido: true },
-        orderBy: { criadoEm: "desc" },
-      });
-      res.json(produtosExcluidos);
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ erro: "Erro ao buscar produtos excluídos" });
-    }
-  });
+    const produto = await prisma.produto.update({
+      where: { id: idNum },
+      data: { nome, descricao, imagem, categoria },
+    });
+    res.json(produto);
+  } catch (error) {
+    console.error("Erro ao atualizar produto:", error.message);
+    res
+      .status(400)
+      .json({ erro: "Erro ao atualizar produto", detalhe: error.message });
+  }
+});
 
-  // Criar produto
-  app.post("/produtos", async (req, res) => {
-    const { nome, descricao, imagem, categoria } = req.body;
-    try {
-      const produto = await prisma.produto.create({
-        data: { nome, descricao, imagem, categoria, excluido: false },
-      });
-      res.status(201).json(produto);
-    } catch (error) {
-      console.error(error);
-      res.status(400).json({ erro: "Erro ao criar produto" });
-    }
-  });
+app.delete("/produtos/:id", async (req, res) => {
+  const { id } = req.params;
 
-  // Atualizar produto
-  app.put("/produtos/:id", async (req, res) => {
-    const { id } = req.params;
-    const { nome, descricao, imagem, categoria } = req.body;
+  const idNum = Number(id);
+  if (isNaN(idNum)) {
+    return res.status(400).json({ erro: "ID inválido" });
+  }
 
-    try {
-      const produto = await prisma.produto.update({
-        where: { id },
-        data: { nome, descricao, imagem, categoria },
-      });
-      res.json(produto);
-    } catch (error) {
-      console.error("Erro ao atualizar produto:", error.message);
-      res
-        .status(400)
-        .json({ erro: "Erro ao atualizar produto", detalhe: error.message });
-    }
-  });
+  try {
+    await prisma.produto.delete({ where: { id: idNum } });
+    res.json({ mensagem: "Produto deletado com sucesso" });
+  } catch (error) {
+    console.error("Erro ao deletar produto:", error.message);
+    res
+      .status(400)
+      .json({ erro: "Erro ao deletar produto", detalhe: error.message });
+  }
+});
 
-  // Excluir produto (exclusão lógica)
-  app.delete("/produtos/:id", async (req, res) => {
-    const { id } = req.params;
-    console.log("ID recebido para exclusão:", id);
-
-    try {
-      const produto = await prisma.produto.update({
-        where: { id },
-        data: { excluido: true },
-      });
-      console.log("Produto marcado como excluído:", produto);
-      res.json({ mensagem: "Produto excluído logicamente", produto });
-    } catch (error) {
-      console.error("Erro ao excluir produto:", error.message);
-      res
-        .status(400)
-        .json({ erro: "Erro ao excluir produto", detalhe: error.message });
-    }
-  });
-
-  // Restaurar produto da lixeira
-  app.put("/produtos/:id/restaurar", async (req, res) => {
-    const { id } = req.params;
-
-    try {
-      const produto = await prisma.produto.update({
-        where: { id },
-        data: { excluido: false },
-      });
-      res.json({ mensagem: "Produto restaurado", produto });
-    } catch (error) {
-      console.error("Erro ao restaurar produto:", error.message);
-      res
-        .status(400)
-        .json({ erro: "Erro ao restaurar produto", detalhe: error.message });
-    }
-  });
-
-  const PORT = process.env.PORT || 3000;
-  app.listen(PORT, () => {
-    console.log(`API rodando em http://localhost:${PORT}`);
-  });
+app.listen(PORT, () => {
+  console.log(`API rodando em http://localhost:${PORT}`);
 });
