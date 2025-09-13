@@ -23,7 +23,10 @@ app.use(
   })
 );
 
-app.use(express.json());
+// app.use(express.json());
+// Permitir payloads maiores (até 25MB)
+app.use(express.json({ limit: "25mb" }));
+app.use(express.urlencoded({ extended: true, limit: "25mb" }));
 
 // Rota raiz de teste
 app.get("/", (req, res) => {
